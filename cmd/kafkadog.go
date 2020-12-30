@@ -340,6 +340,24 @@ func main() {
 						Aliases: []string{"t"},
 						Usage:   "which topic to consume msg",
 					},
+					&cli.IntFlag{
+						Name:    "partition",
+						Aliases: []string{"p"},
+						Value:   10,
+						Usage:   "how many partition in the topic",
+					},
+					&cli.IntFlag{
+						Name:    "replica",
+						Aliases: []string{"r"},
+						Value:   3,
+						Usage:   "how many replicas in the partition",
+					},
+					&cli.IntFlag{
+						Name:    "msgnum",
+						Aliases: []string{"n"},
+						Value:   50,
+						Usage:   "how many msgs to test",
+					},
 				},
 				Action: func(c *cli.Context) error {
 					bootstrap := c.String("bootstrap-server")
@@ -350,8 +368,9 @@ func main() {
 					topic := c.String("topic")
 					fmt.Println("created topic: ", topic)
 
-					numPart := 10
-					replicas := 3
+					numPart := c.Int("partition")
+					replicas := c.Int("replica")
+					numMsg := c.Int("msgnum")
 
 					wait, err := time.ParseDuration("10s")
 					if err != nil {
@@ -382,7 +401,7 @@ func main() {
 					deliveryChan := make(chan kafka.Event)
 
 					msg := "Greeting from Kafkadog!"
-					for i := 0; i < 50; i++ {
+					for i := 0; i < numMsg; i++ {
 						value := msg + " NO. " + strconv.Itoa(i)
 						err = p.Produce(&kafka.Message{
 							TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
@@ -400,6 +419,7 @@ func main() {
 								*m.TopicPartition.Topic, m.TopicPartition.Partition, m.TopicPartition.Offset)
 						}
 					}
+					fmt.Printf("Produced %d messages!\n", numMsg)
 					close(deliveryChan)
 
 					fmt.Printf("start to consume topic %s \n", topic)
@@ -462,8 +482,11 @@ func main() {
 								//fmt.Printf("Ignored %v\n", e)
 								if !stb {
 									fmt.Printf("Consumed %d messages!\n", totalmsg)
+									for i := 0; i < numPart; i++ {
+										showPartitionOffset(consumer, topic, i)
+									}
 									consumer.Close()
-									if totalmsg != 50 {
+									if totalmsg != numMsg {
 										fmt.Printf("messages produced does not match the message consumed!\n")
 										os.Exit(1)
 									} else {
@@ -509,6 +532,18 @@ func main() {
 						Value:   "",
 						Usage:   "resource name, could be broker id, topic, consumer group ",
 					},
+					&cli.StringFlag{
+						Name:    "topic",
+						Aliases: []string{"t"},
+						Value:   "",
+						Usage:   "which topic to produce msg",
+					},
+					&cli.IntFlag{
+						Name:    "partition",
+						Aliases: []string{"p"},
+						Value:   -1,
+						Usage:   "which partition to produce msg, if not set, produced to a random partition",
+					},
 				},
 				Action: func(c *cli.Context) error {
 					rtype := c.String("type")
@@ -545,6 +580,12 @@ func main() {
 								entry.IsReadOnly, entry.IsSensitive)
 						}
 					}
+
+					topic := c.String("topic")
+					partition := c.Int("partition")
+					if topic != "" && partition != -1 {
+						//showPartitionOffset()
+					}
 					ac.Close()
 					return nil
 				},
@@ -555,5 +596,26 @@ func main() {
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)
+	}
+}
+
+func showPartitionOffset(c *kafka.Consumer, topic string, partition int) {
+	committedOffsets, err := c.Committed([]kafka.TopicPartition{{
+		Topic:     &topic,
+		Partition: int32(partition),
+	}}, 5000)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to fetch offset: %s\n", err)
+		os.Exit(1)
+	}
+
+	committedOffset := committedOffsets[0]
+
+	fmt.Printf("Committed partition %d offset: %d\n", committedOffset.Partition, committedOffset.Offset)
+
+	if committedOffset.Metadata != nil {
+		fmt.Printf(" metadata: %s", *committedOffset.Metadata)
+	} else {
+		//fmt.Println("\n Looks like we fetch empty metadata. Ensure that librdkafka version > v1.1.0")
 	}
 }
