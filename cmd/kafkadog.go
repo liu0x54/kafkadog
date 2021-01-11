@@ -447,6 +447,10 @@ func main() {
 					//fmt.Printf("Created Consumer %v\n", c)
 
 					err = consumer.SubscribeTopics(topics, nil)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "Failed to subscribe topic : %s\n", err)
+						os.Exit(1)
+					}
 
 					run := true
 
@@ -479,7 +483,7 @@ func main() {
 									run = false
 								}
 							default:
-								//fmt.Printf("Ignored %v\n", e)
+								fmt.Printf("Ignored %v\n", e)
 								if !stb {
 									fmt.Printf("Consumed %d messages!\n", totalmsg)
 									for i := 0; i < numPart; i++ {
