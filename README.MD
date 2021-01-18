@@ -3,7 +3,7 @@ A kafka client based on the [confluent-kafka-go](https://github.com/confluentinc
 ## usage
 
 ```
-./kafkadog --bootstrap-server YOUR-KAFKA-BOOTSTRAP-SERVER:PORT fastverify --topic testtopic
+./kafkadog --bootstrap-server YOUR-KAFKA-BOOTSTRAP-SERVER:PORT fastverify --topic testtopic --partition 10 --replica 3 --msgnum 1000
 ```
 if the result is 
 ```
