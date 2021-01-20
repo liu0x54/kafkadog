@@ -421,6 +421,24 @@ func main() {
 					}
 					fmt.Printf("Produced %d messages!\n", numMsg)
 					close(deliveryChan)
+					resourceType, _ := kafka.ResourceTypeFromString("topic")
+					dsresults, dserr := ac.DescribeConfigs(ctx,
+						[]kafka.ConfigResource{{Type: resourceType, Name: topic}},
+						kafka.SetAdminRequestTimeout(wait))
+					if dserr != nil {
+						fmt.Printf("Failed to DescribeConfigs(%s, %s): %s\n",
+							"topic", topic, err)
+						os.Exit(1)
+					}
+
+					for _, result := range dsresults {
+						fmt.Printf("%s %s: %s:\n", result.Type, result.Name, result.Error)
+						for _, entry := range result.Config {
+							fmt.Printf("%60s = %-60.60s   %-20s Read-only:%v Sensitive:%v\n",
+								entry.Name, entry.Value, entry.Source,
+								entry.IsReadOnly, entry.IsSensitive)
+						}
+					}
 
 					fmt.Printf("start to consume topic %s \n", topic)
 					groupid := "group1"
